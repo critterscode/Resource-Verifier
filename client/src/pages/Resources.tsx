@@ -10,10 +10,14 @@ import {
   Edit,
   Trash2,
   Phone,
-  MapPin
+  MapPin,
+  ExternalLink,
+  Tag
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   Dialog,
@@ -21,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -36,8 +41,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ResourceForm } from "@/components/ResourceForm";
-import type { Resource } from "@shared/routes";
+import type { Resource } from "@shared/schema";
 import { api } from "@shared/routes";
+
+function makeWebsiteUrl(website: string): string {
+  if (!website) return '';
+  if (website.startsWith('http://') || website.startsWith('https://')) return website;
+  return `https://${website}`;
+}
 
 export default function Resources() {
   const [search, setSearch] = useState("");
@@ -86,13 +97,13 @@ export default function Resources() {
           <p className="text-muted-foreground">Manage and verify community resources.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" onClick={handleExport} data-testid="button-export">
             <Download className="w-4 h-4 mr-2" />
             Export CSV
           </Button>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button className="shadow-lg shadow-primary/20">
+              <Button data-testid="button-add-resource">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Resource
               </Button>
@@ -100,6 +111,7 @@ export default function Resources() {
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Resource</DialogTitle>
+                <DialogDescription>Fill in the details for the new resource.</DialogDescription>
               </DialogHeader>
               <ResourceForm 
                 onSubmit={handleCreate} 
@@ -116,6 +128,7 @@ export default function Resources() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
+            data-testid="input-search"
             placeholder="Search by name, services, phone..." 
             className="pl-9" 
             value={search}
@@ -124,7 +137,7 @@ export default function Resources() {
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
               <div className="flex items-center gap-2">
                  <Filter className="w-4 h-4 text-muted-foreground" />
                  <SelectValue placeholder="Category" />
@@ -139,7 +152,7 @@ export default function Resources() {
           </Select>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -157,7 +170,7 @@ export default function Resources() {
         <table className="w-full text-sm text-left">
           <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-border sticky top-0 backdrop-blur-sm z-10">
             <tr>
-              <th className="px-6 py-4 w-[40%]">Name & Description</th>
+              <th className="px-6 py-4 w-[35%]">Name & Description</th>
               <th className="px-6 py-4">Category</th>
               <th className="px-6 py-4">Contact</th>
               <th className="px-6 py-4">Status</th>
@@ -166,7 +179,6 @@ export default function Resources() {
           </thead>
           <tbody className="divide-y divide-border">
             {isLoading ? (
-               // Loading Skeletons
                Array.from({ length: 5 }).map((_, i) => (
                  <tr key={i}>
                    <td className="px-6 py-4"><Skeleton className="h-10 w-48" /></td>
@@ -183,29 +195,69 @@ export default function Resources() {
                  </td>
                </tr>
             ) : (
-              resources?.map((resource) => (
-                <tr key={resource.id} className="group hover:bg-muted/30 transition-colors">
+              resources?.map((resource: Resource) => (
+                <tr key={resource.id} className="group hover:bg-muted/30 transition-colors" data-testid={`row-resource-${resource.id}`}>
                   <td className="px-6 py-4 align-top">
                     <div className="flex flex-col gap-1">
-                      <span className="font-semibold text-foreground text-base">{resource.name}</span>
-                      <span className="text-muted-foreground line-clamp-2">{resource.services || "No services listed"}</span>
+                      <a 
+                        href={`https://www.google.com/search?q=${encodeURIComponent(resource.name)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-foreground text-base hover:text-primary hover:underline inline-flex items-center gap-1"
+                        data-testid={`link-name-${resource.id}`}
+                      >
+                        {resource.name}
+                        <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-50" />
+                      </a>
+                      <span className="text-muted-foreground line-clamp-2 text-xs">{resource.services || "No services listed"}</span>
+                      {resource.tags && resource.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {resource.tags.slice(0, 3).map(tag => (
+                            <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                              <Tag className="w-2.5 h-2.5" />{tag}
+                            </span>
+                          ))}
+                          {resource.tags.length > 3 && (
+                            <span className="text-[10px] text-muted-foreground">+{resource.tags.length - 3}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 align-top">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium">
                       {resource.category}
                     </span>
+                    {resource.categories && resource.categories.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {resource.categories.map(c => (
+                          <span key={c} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{c}</span>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 align-top">
-                    <div className="flex flex-col gap-1 text-muted-foreground">
+                    <div className="flex flex-col gap-1 text-muted-foreground text-xs">
                       {resource.phone && (
                         <div className="flex items-center gap-1.5">
                           <Phone className="w-3 h-3" /> {resource.phone}
                         </div>
                       )}
+                      {resource.website && (
+                        <a 
+                          href={makeWebsiteUrl(resource.website)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-primary hover:underline truncate max-w-[180px]"
+                          data-testid={`link-website-${resource.id}`}
+                        >
+                          <ExternalLink className="w-3 h-3 flex-shrink-0" /> 
+                          {resource.website.replace(/^https?:\/\//, '')}
+                        </a>
+                      )}
                       {resource.address && (
                         <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3 h-3" /> <span className="truncate max-w-[150px]">{resource.address}</span>
+                          <MapPin className="w-3 h-3 flex-shrink-0" /> <span className="truncate max-w-[150px]">{resource.address}</span>
                         </div>
                       )}
                     </div>
@@ -218,23 +270,22 @@ export default function Resources() {
                        <Button 
                          variant="ghost" 
                          size="icon" 
-                         className="h-8 w-8 text-muted-foreground hover:text-amber-400"
                          onClick={() => toggleFavorite(resource)}
+                         data-testid={`button-favorite-${resource.id}`}
                        >
-                         <Star className={`w-4 h-4 ${resource.isFavorite ? "fill-current text-amber-400" : ""}`} />
+                         <Star className={`w-4 h-4 ${resource.isFavorite ? "fill-current text-amber-400" : "text-muted-foreground"}`} />
                        </Button>
                        
                        <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" data-testid={`button-actions-${resource.id}`}>
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setEditingResource(resource)}>
+                          <DropdownMenuItem onClick={() => setEditingResource(resource)} data-testid={`button-edit-${resource.id}`}>
                             <Edit className="w-4 h-4 mr-2" /> Edit
                           </DropdownMenuItem>
-                          {/* Add delete implementation if needed, though schema has it */}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -251,6 +302,7 @@ export default function Resources() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Resource</DialogTitle>
+            <DialogDescription>Update the resource details below.</DialogDescription>
           </DialogHeader>
           {editingResource && (
             <ResourceForm 

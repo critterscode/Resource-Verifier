@@ -1,16 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type CreateResourceRequest, type UpdateResourceRequest } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
+import type { InsertResource, UpdateResourceRequest } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export function useResources(filters?: { search?: string; category?: string; status?: "unverified" | "verified" | "missing_info"; isFavorite?: boolean }) {
-  // Convert boolean isFavorite to string 'true'/'false' for the API schema validation if needed,
-  // or pass as is if the schema handles it. The schema expects string 'true' for transformation.
   const queryParams: Record<string, any> = { ...filters };
   if (filters?.isFavorite !== undefined) {
     queryParams.isFavorite = String(filters.isFavorite);
   }
 
-  // Remove undefined keys
   Object.keys(queryParams).forEach(key => queryParams[key] === undefined && delete queryParams[key]);
 
   const queryString = new URLSearchParams(queryParams).toString();
@@ -21,7 +19,7 @@ export function useResources(filters?: { search?: string; category?: string; sta
     queryFn: async () => {
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch resources");
-      return api.resources.list.responses[200].parse(await res.json());
+      return res.json();
     },
   });
 }
@@ -34,7 +32,7 @@ export function useResource(id: number) {
       const res = await fetch(url);
       if (res.status === 404) return null;
       if (!res.ok) throw new Error("Failed to fetch resource");
-      return api.resources.get.responses[200].parse(await res.json());
+      return res.json();
     },
     enabled: !!id,
   });
@@ -46,7 +44,18 @@ export function useCategories() {
     queryFn: async () => {
       const res = await fetch(api.resources.categories.path);
       if (!res.ok) throw new Error("Failed to fetch categories");
-      return api.resources.categories.responses[200].parse(await res.json());
+      return res.json() as Promise<string[]>;
+    }
+  });
+}
+
+export function useTags() {
+  return useQuery({
+    queryKey: ['/api/tags'],
+    queryFn: async () => {
+      const res = await fetch('/api/tags');
+      if (!res.ok) throw new Error("Failed to fetch tags");
+      return res.json() as Promise<string[]>;
     }
   });
 }
@@ -56,26 +65,26 @@ export function useCreateResource() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (data: CreateResourceRequest) => {
+    mutationFn: async (data: InsertResource) => {
       const res = await fetch(api.resources.create.path, {
         method: api.resources.create.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
       if (!res.ok) {
-         // Try to parse validation error
          try {
            const error = await res.json();
            throw new Error(error.message || "Failed to create resource");
-         } catch (e) {
+         } catch {
            throw new Error("Failed to create resource");
          }
       }
-      return api.resources.create.responses[201].parse(await res.json());
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.resources.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.resources.categories.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tags'] });
       toast({ title: "Success", description: "Resource created successfully" });
     },
     onError: (error) => {
@@ -97,11 +106,12 @@ export function useUpdateResource() {
         body: JSON.stringify(updates),
       });
       if (!res.ok) throw new Error("Failed to update resource");
-      return api.resources.update.responses[200].parse(await res.json());
+      return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [api.resources.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.resources.get.path, data.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tags'] });
       toast({ title: "Updated", description: "Resource updated successfully" });
     },
     onError: (error) => {

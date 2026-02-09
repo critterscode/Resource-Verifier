@@ -1,4 +1,3 @@
-
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
@@ -20,7 +19,7 @@ export async function registerRoutes(
         search: req.query.search as string,
         category: req.query.category as string,
         status: req.query.status as string,
-        isFavorite: req.query.isFavorite === 'true'
+        isFavorite: req.query.isFavorite === 'true' ? true : undefined
       };
       
       const resources = await storage.getResources(filters);
@@ -80,7 +79,6 @@ export async function registerRoutes(
   app.get(api.resources.export.path, async (req, res) => {
     const resources = await storage.getResources();
     
-    // Create CSV content
     const header = "Category,Categories,Name,Phone,Email,Website,Address,Services,Hours,Status,Notes,Access Info,Eligibility,Service Area,Tags\n";
     const rows = resources.map(r => {
       return [
@@ -175,8 +173,7 @@ async function seedFromExcel() {
     const excelPath = path.join(process.cwd(), 'attached_assets', 'lanehelp_master_final_ready_1770662026136.xlsx');
     
     if (!fs.existsSync(excelPath)) {
-      console.log("Excel file not found, skipping seed.");
-      // Fallback seed
+      console.log("Excel file not found, using fallback seed.");
       await storage.createResource({
         category: "DENTAL - EXAMS & PREVENTIVE",
         name: "LANE COMMUNITY COLLEGE DENTAL CLINIC",
@@ -186,7 +183,8 @@ async function seedFromExcel() {
         services: "Dental exams, cleanings, X-rays, Fluoride treatment, sealants, oral health education and preventive care.",
         hours: "Mon - Fri | 8 am - 5 pm",
         status: "verified",
-        isFavorite: true
+        isFavorite: true,
+        tags: ["Dental", "Preventive"],
       });
       return;
     }
@@ -200,22 +198,27 @@ async function seedFromExcel() {
     console.log(`Found ${data.length} rows in Excel.`);
 
     for (const row of data) {
+      const rawTags = (row['Tags'] || '').toString().trim();
+      const tags = rawTags ? rawTags.split(';').map((t: string) => t.trim()).filter(Boolean) : [];
+
       const resource = {
-        category: row['Category'] || row['CATEGORY'] || "General",
-        name: row['Name'] || row['NAME'] || row['Agency Name'] || "Unknown Name",
-        phone: row['Phone'] || row['PHONE'] || "",
-        email: row['Email'] || row['EMAIL'] || "",
-        website: row['Website'] || row['WEBSITE'] || "",
-        address: row['Address'] || row['ADDRESS'] || "",
-        services: row['Services'] || row['SERVICES'] || row['Description'] || "",
-        hours: row['Hours'] || row['HOURS'] || "",
-        accessInfo: row['Access Info'] || row['ACCESS INFO'] || "",
-        eligibility: row['Eligibility'] || row['ELIGIBILITY'] || "",
-        serviceArea: row['Service Area'] || row['SERVICE AREA'] || "",
-        status: "unverified" as const
+        category: (row['Category'] || 'General').toString().trim(),
+        name: (row['Name'] || '').toString().trim(),
+        phone: (row['Phone'] || '').toString().trim(),
+        email: (row['Email'] || '').toString().trim(),
+        website: (row['Website'] || '').toString().trim(),
+        address: (row['Address'] || '').toString().trim(),
+        services: (row['Description'] || '').toString().trim(),
+        hours: (row['Hours'] || '').toString().trim(),
+        accessInfo: (row['Access'] || '').toString().trim(),
+        eligibility: (row['Eligibility'] || '').toString().trim(),
+        serviceArea: (row['Service_Area'] || '').toString().trim(),
+        tags: tags.length > 0 ? tags : null,
+        status: "unverified" as const,
+        isFavorite: false,
       };
 
-      if (resource.name !== "Unknown Name") {
+      if (resource.name) {
         await storage.createResource(resource);
       }
     }
