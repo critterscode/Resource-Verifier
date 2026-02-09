@@ -81,10 +81,11 @@ export async function registerRoutes(
     const resources = await storage.getResources();
     
     // Create CSV content
-    const header = "Category,Name,Phone,Email,Website,Address,Services,Hours,Status,Notes\n";
+    const header = "Category,Categories,Name,Phone,Email,Website,Address,Services,Hours,Status,Notes,Access Info,Eligibility,Service Area,Tags\n";
     const rows = resources.map(r => {
       return [
         r.category,
+        (r.categories || []).join('; '),
         r.name,
         r.phone,
         r.email,
@@ -93,7 +94,11 @@ export async function registerRoutes(
         r.services,
         r.hours,
         r.status,
-        r.notes
+        r.notes,
+        r.accessInfo,
+        r.eligibility,
+        r.serviceArea,
+        (r.tags || []).join('; ')
       ].map(field => `"${(field || '').replace(/"/g, '""')}"`).join(',');
     }).join('\n');
 
@@ -102,10 +107,15 @@ export async function registerRoutes(
     res.send(header + rows);
   });
 
-  // Categories
+  // Categories & Tags
   app.get(api.resources.categories.path, async (req, res) => {
     const categories = await storage.getAllCategories();
     res.json(categories);
+  });
+
+  app.get('/api/tags', async (req, res) => {
+    const tags = await (storage as any).getAllTags();
+    res.json(tags);
   });
 
   // Collections
@@ -190,9 +200,6 @@ async function seedFromExcel() {
     console.log(`Found ${data.length} rows in Excel.`);
 
     for (const row of data) {
-      // Map Excel columns to our schema
-      // This mapping depends on the actual column names in the Excel file
-      // I'm making educated guesses based on common patterns, and providing fallbacks
       const resource = {
         category: row['Category'] || row['CATEGORY'] || "General",
         name: row['Name'] || row['NAME'] || row['Agency Name'] || "Unknown Name",
@@ -202,6 +209,9 @@ async function seedFromExcel() {
         address: row['Address'] || row['ADDRESS'] || "",
         services: row['Services'] || row['SERVICES'] || row['Description'] || "",
         hours: row['Hours'] || row['HOURS'] || "",
+        accessInfo: row['Access Info'] || row['ACCESS INFO'] || "",
+        eligibility: row['Eligibility'] || row['ELIGIBILITY'] || "",
+        serviceArea: row['Service Area'] || row['SERVICE AREA'] || "",
         status: "unverified" as const
       };
 

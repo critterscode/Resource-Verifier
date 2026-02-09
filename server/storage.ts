@@ -53,7 +53,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select()
       .from(resources)
       .where(and(...conditions))
-      .orderBy(resources.category, resources.name);
+      .orderBy(resources.name);
   }
 
   async getResource(id: number): Promise<Resource | undefined> {
@@ -80,7 +80,24 @@ export class DatabaseStorage implements IStorage {
 
   async getAllCategories(): Promise<string[]> {
     const result = await db.selectDistinct({ category: resources.category }).from(resources);
-    return result.map(r => r.category).sort();
+    const resultMulti = await db.select({ categories: resources.categories }).from(resources);
+    
+    const all = new Set<string>();
+    result.forEach(r => { if (r.category) all.add(r.category); });
+    resultMulti.forEach(r => {
+      if (r.categories) r.categories.forEach(c => all.add(c));
+    });
+    
+    return Array.from(all).sort();
+  }
+
+  async getAllTags(): Promise<string[]> {
+    const result = await db.select({ tags: resources.tags }).from(resources);
+    const all = new Set<string>();
+    result.forEach(r => {
+      if (r.tags) r.tags.forEach(t => all.add(t));
+    });
+    return Array.from(all).sort();
   }
 
   // Collections

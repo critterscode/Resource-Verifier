@@ -9,6 +9,7 @@ import { relations } from "drizzle-orm";
 export const resources = pgTable("resources", {
   id: serial("id").primaryKey(),
   category: text("category").notNull(),
+  categories: text("categories").array(), // For up to 2 categories
   name: text("name").notNull(),
   phone: text("phone"),
   email: text("email"),
@@ -17,10 +18,18 @@ export const resources = pgTable("resources", {
   services: text("services"),
   hours: text("hours"),
   
+  // New CSV columns
+  accessInfo: text("access_info"),
+  eligibility: text("eligibility"),
+  serviceArea: text("service_area"),
+  
+  // Tags
+  tags: text("tags").array(),
+  
   // Status tracking
   status: text("status", { enum: ["unverified", "verified", "missing_info"] }).default("unverified").notNull(),
   isFavorite: boolean("is_favorite").default(false).notNull(),
-  notes: text("notes"), // For internal notes/missing info details
+  notes: text("notes"),
   
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -77,7 +86,7 @@ export type InsertCollection = z.infer<typeof insertCollectionSchema>;
 export type CreateResourceRequest = InsertResource;
 export type UpdateResourceRequest = Partial<InsertResource>;
 
-// CSV Import Type (loose type for processing uploads)
+// CSV Import Type
 export type CsvImportRow = Record<string, string>;
 
 // Response types
