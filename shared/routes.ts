@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { insertResourceSchema, insertCollectionSchema, resources, collections, collectionItems } from './schema';
+import { insertResourceSchema, insertListSchema, insertVerificationEventSchema, insertManagedTagSchema, insertManagedCategorySchema } from './schema';
 
 // ============================================
 // SHARED ERROR SCHEMAS
@@ -29,106 +29,120 @@ export const api = {
       input: z.object({
         search: z.string().optional(),
         category: z.string().optional(),
-        status: z.enum(["unverified", "verified", "missing_info"]).optional(),
+        status: z.enum(["unverified", "verified", "needs_info", "closed", "limited"]).optional(),
         isFavorite: z.string().transform(val => val === 'true').optional(),
+        limit: z.string().transform(Number).optional(),
+        offset: z.string().transform(Number).optional(),
       }).optional(),
-      responses: {
-        200: z.array(z.custom<typeof resources.$inferSelect>()),
-      },
+    },
+    count: {
+      method: 'GET' as const,
+      path: '/api/resources/count' as const,
     },
     get: {
       method: 'GET' as const,
       path: '/api/resources/:id' as const,
-      responses: {
-        200: z.custom<typeof resources.$inferSelect>(),
-        404: errorSchemas.notFound,
-      },
     },
     create: {
       method: 'POST' as const,
       path: '/api/resources' as const,
       input: insertResourceSchema,
-      responses: {
-        201: z.custom<typeof resources.$inferSelect>(),
-        400: errorSchemas.validation,
-      },
     },
     update: {
       method: 'PUT' as const,
       path: '/api/resources/:id' as const,
       input: insertResourceSchema.partial(),
-      responses: {
-        200: z.custom<typeof resources.$inferSelect>(),
-        400: errorSchemas.validation,
-        404: errorSchemas.notFound,
-      },
     },
     delete: {
       method: 'DELETE' as const,
       path: '/api/resources/:id' as const,
-      responses: {
-        204: z.void(),
-        404: errorSchemas.notFound,
-      },
+    },
+    bulkUpdate: {
+      method: 'PUT' as const,
+      path: '/api/resources/bulk' as const,
+      input: z.object({
+        ids: z.array(z.number()),
+        updates: insertResourceSchema.partial(),
+      }),
     },
     export: {
       method: 'GET' as const,
       path: '/api/resources/export/csv' as const,
-      responses: {
-        200: z.string(), // Returns CSV string
-      },
     },
     categories: {
       method: 'GET' as const,
       path: '/api/categories' as const,
-      responses: {
-        200: z.array(z.string()),
-      }
-    }
+    },
+    tags: {
+      method: 'GET' as const,
+      path: '/api/tags' as const,
+    },
   },
-  collections: {
+  verificationEvents: {
     list: {
       method: 'GET' as const,
-      path: '/api/collections' as const,
-      responses: {
-        200: z.array(z.custom<typeof collections.$inferSelect>()),
-      },
+      path: '/api/resources/:id/verification-events' as const,
     },
     create: {
       method: 'POST' as const,
-      path: '/api/collections' as const,
-      input: insertCollectionSchema,
-      responses: {
-        201: z.custom<typeof collections.$inferSelect>(),
-        400: errorSchemas.validation,
-      },
+      path: '/api/resources/:id/verification-events' as const,
+      input: insertVerificationEventSchema.omit({ resourceId: true }),
+    },
+  },
+  managedTags: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/managed-tags' as const,
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/managed-tags' as const,
+      input: insertManagedTagSchema,
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/managed-tags/:id' as const,
+    },
+  },
+  managedCategories: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/managed-categories' as const,
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/managed-categories' as const,
+      input: insertManagedCategorySchema,
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/managed-categories/:id' as const,
+    },
+  },
+  lists: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/lists' as const,
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/lists' as const,
+      input: insertListSchema,
     },
     get: {
       method: 'GET' as const,
-      path: '/api/collections/:id' as const,
-      responses: {
-        200: z.custom<typeof collections.$inferSelect & { resources: typeof resources.$inferSelect[] }>(),
-        404: errorSchemas.notFound,
-      },
+      path: '/api/lists/:id' as const,
     },
     addItem: {
       method: 'POST' as const,
-      path: '/api/collections/:id/items' as const,
+      path: '/api/lists/:id/items' as const,
       input: z.object({ resourceId: z.number() }),
-      responses: {
-        201: z.void(),
-        404: errorSchemas.notFound,
-      },
     },
     removeItem: {
       method: 'DELETE' as const,
-      path: '/api/collections/:id/items/:resourceId' as const,
-      responses: {
-        204: z.void(),
-        404: errorSchemas.notFound,
-      },
-    }
-  }
+      path: '/api/lists/:id/items/:resourceId' as const,
+    },
+  },
 };
 
 // ============================================

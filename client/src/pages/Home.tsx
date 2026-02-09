@@ -17,7 +17,7 @@ export default function Home() {
   const { data: resources, isLoading } = useResources();
 
   const verifiedCount = resources?.filter(r => r.status === "verified").length || 0;
-  const missingInfoCount = resources?.filter(r => r.status === "missing_info").length || 0;
+  const missingInfoCount = resources?.filter(r => r.status === "needs_info").length || 0;
   const favorites = resources?.filter(r => r.isFavorite).slice(0, 5) || [];
 
   return (

@@ -1,12 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import type { InsertResource, UpdateResourceRequest } from "@shared/schema";
+import type { InsertResource, UpdateResourceRequest, InsertVerificationEvent } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
-export function useResources(filters?: { search?: string; category?: string; status?: "unverified" | "verified" | "missing_info"; isFavorite?: boolean }) {
+export function useResources(filters?: { search?: string; category?: string; status?: "unverified" | "verified" | "needs_info" | "closed" | "limited"; isFavorite?: boolean; limit?: number; offset?: number }) {
   const queryParams: Record<string, any> = { ...filters };
   if (filters?.isFavorite !== undefined) {
     queryParams.isFavorite = String(filters.isFavorite);
+  }
+  if (filters?.limit !== undefined) {
+    queryParams.limit = String(filters.limit);
+  }
+  if (filters?.offset !== undefined) {
+    queryParams.offset = String(filters.offset);
   }
 
   Object.keys(queryParams).forEach(key => queryParams[key] === undefined && delete queryParams[key]);
@@ -20,6 +26,23 @@ export function useResources(filters?: { search?: string; category?: string; sta
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch resources");
       return res.json();
+    },
+  });
+}
+
+export function useResourceCount(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean }) {
+  const queryParams: Record<string, any> = { ...filters };
+  Object.keys(queryParams).forEach(key => queryParams[key] === undefined && delete queryParams[key]);
+  const queryString = new URLSearchParams(queryParams).toString();
+  const url = `${api.resources.count.path}${queryString ? `?${queryString}` : ''}`;
+
+  return useQuery({
+    queryKey: [api.resources.count.path, filters],
+    queryFn: async () => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch count");
+      const data = await res.json();
+      return data.count as number;
     },
   });
 }
@@ -137,5 +160,61 @@ export function useDeleteResource() {
     onError: (error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
+  });
+}
+
+export function useBulkUpdateResources() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ ids, updates }: { ids: number[]; updates: UpdateResourceRequest }) => {
+      const res = await fetch(api.resources.bulkUpdate.path, {
+        method: 'PUT',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, updates }),
+      });
+      if (!res.ok) throw new Error("Failed to bulk update resources");
+      return res.json();
+    },
+    onSuccess: (_, { ids }) => {
+      queryClient.invalidateQueries({ queryKey: [api.resources.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tags'] });
+      toast({ title: "Updated", description: `${ids.length} resources updated` });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+}
+
+export function useVerificationEvents(resourceId: number) {
+  return useQuery({
+    queryKey: ['/api/resources', resourceId, 'verification-events'],
+    queryFn: async () => {
+      const res = await fetch(`/api/resources/${resourceId}/verification-events`);
+      if (!res.ok) throw new Error("Failed to fetch verification events");
+      return res.json();
+    },
+    enabled: !!resourceId,
+  });
+}
+
+export function useCreateVerificationEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ resourceId, event }: { resourceId: number; event: Omit<InsertVerificationEvent, 'resourceId'> }) => {
+      const res = await fetch(`/api/resources/${resourceId}/verification-events`, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+      });
+      if (!res.ok) throw new Error("Failed to create verification event");
+      return res.json();
+    },
+    onSuccess: (_, { resourceId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/resources', resourceId, 'verification-events'] });
+    },
   });
 }

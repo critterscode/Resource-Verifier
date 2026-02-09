@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect } from "react";
-import { useResources, useUpdateResource, useTags, useCategories } from "@/hooks/use-resources";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useResources, useUpdateResource, useTags, useCategories, useCreateVerificationEvent } from "@/hooks/use-resources";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { 
   ArrowLeft, 
@@ -21,7 +22,9 @@ import {
   Tag,
   X,
   ExternalLink,
-  Plus
+  Plus,
+  XCircle,
+  Keyboard
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Resource } from "@shared/schema";
@@ -169,43 +172,135 @@ function InlineNameInput({
   );
 }
 
+const FIELDS_TO_CHECK = [
+  { key: "website", label: "Website" },
+  { key: "phone", label: "Phone" },
+  { key: "hours", label: "Hours" },
+  { key: "address", label: "Address" },
+  { key: "eligibility", label: "Eligibility" },
+  { key: "access", label: "Access" },
+  { key: "serviceArea", label: "Service Area" },
+  { key: "email", label: "Email" },
+] as const;
+
 export default function Review() {
   const { data: resources, isLoading } = useResources();
   const { data: existingTags } = useTags();
   const { data: existingCategories } = useCategories();
   const updateMutation = useUpdateResource();
+  const createVerificationEvent = useCreateVerificationEvent();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [newTag, setNewTag] = useState("");
+  const [fieldsChecked, setFieldsChecked] = useState<Record<string, boolean>>({});
+  const [verificationMethod, setVerificationMethod] = useState<string>("website_check");
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
 
   const reviewQueue = resources || [];
   const currentResource = reviewQueue[currentIndex];
 
-  const handleNext = () => {
+  const hasCheckedFields = Object.values(fieldsChecked).some(Boolean);
+  const checkedFieldNames = Object.entries(fieldsChecked)
+    .filter(([_, checked]) => checked)
+    .map(([key]) => key);
+
+  useEffect(() => {
+    setFieldsChecked({});
+    setVerificationMethod("website_check");
+  }, [currentIndex]);
+
+  const handleNext = useCallback(() => {
     if (currentIndex < reviewQueue.length - 1) {
       setCurrentIndex(prev => prev + 1);
     }
-  };
+  }, [currentIndex, reviewQueue.length]);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
     }
-  };
+  }, [currentIndex]);
 
   const saveField = useCallback((field: string, value: any) => {
     if (!currentResource) return;
     updateMutation.mutate({ id: currentResource.id, updates: { [field]: value } });
   }, [currentResource, updateMutation]);
 
-  const updateStatus = (status: "verified" | "missing_info") => {
-    if (currentResource) {
-      updateMutation.mutate({ 
-        id: currentResource.id, 
-        updates: { status } 
-      });
-      handleNext();
+  const updateStatus = useCallback((status: "verified" | "needs_info" | "closed") => {
+    if (!currentResource) return;
+
+    if (status === "verified" && !hasCheckedFields) {
+      return;
     }
-  };
+
+    updateMutation.mutate({ 
+      id: currentResource.id, 
+      updates: { 
+        status,
+        ...(status === "verified" ? { lastVerifiedAt: new Date().toISOString() as any } : {}),
+      } 
+    });
+
+    createVerificationEvent.mutate({
+      resourceId: currentResource.id,
+      event: {
+        performedByRole: "staff",
+        method: verificationMethod as any,
+        result: status === "verified" ? "verified" : status === "needs_info" ? "needs_info" : "closed",
+        fieldsChecked: checkedFieldNames,
+        notes: null,
+        receiptId: null,
+        performedByUserId: null,
+      },
+    });
+
+    handleNext();
+  }, [currentResource, hasCheckedFields, checkedFieldNames, verificationMethod, updateMutation, createVerificationEvent, handleNext]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      if (isInput) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'v':
+          e.preventDefault();
+          updateStatus("verified");
+          break;
+        case 'm':
+          e.preventDefault();
+          updateStatus("needs_info");
+          break;
+        case 'c':
+          e.preventDefault();
+          updateStatus("closed");
+          break;
+        case 'n':
+        case 'arrowright':
+          e.preventDefault();
+          handleNext();
+          break;
+        case 'p':
+        case 'arrowleft':
+          e.preventDefault();
+          handlePrev();
+          break;
+        case 't':
+          e.preventDefault();
+          tagInputRef.current?.focus();
+          break;
+        case '?':
+          e.preventDefault();
+          setShowShortcuts(prev => !prev);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleNext, handlePrev, updateStatus]);
 
   const toggleTagOnCurrent = (tag: string) => {
     if (!currentResource) return;
@@ -236,6 +331,10 @@ export default function Review() {
     updateMutation.mutate({ id: currentResource.id, updates: { categories: updated } });
   };
 
+  const toggleFieldCheck = (field: string) => {
+    setFieldsChecked(prev => ({ ...prev, [field]: !prev[field] }));
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -262,12 +361,36 @@ export default function Review() {
        <div className="flex items-center justify-between">
          <h1 className="text-xl font-display font-bold" data-testid="text-review-title">Review Mode</h1>
          <div className="flex items-center gap-3">
+           <Button
+             variant="ghost"
+             size="icon"
+             onClick={() => setShowShortcuts(prev => !prev)}
+             data-testid="button-toggle-shortcuts"
+             title="Keyboard shortcuts (?)"
+           >
+             <Keyboard className="w-4 h-4" />
+           </Button>
            <StatusBadge status={currentResource.status} />
            <div className="text-sm text-muted-foreground font-medium" data-testid="text-review-counter">
               {currentIndex + 1} / {reviewQueue.length}
            </div>
          </div>
        </div>
+
+       {showShortcuts && (
+         <div className="bg-card border border-border rounded-md p-3 text-xs space-y-1" data-testid="panel-shortcuts">
+           <div className="font-semibold text-sm mb-2">Keyboard Shortcuts</div>
+           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+             <div><kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">V</kbd> Verify (requires fields checked)</div>
+             <div><kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">M</kbd> Mark needs info</div>
+             <div><kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">C</kbd> Mark closed</div>
+             <div><kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">N</kbd> Next card</div>
+             <div><kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">P</kbd> Previous card</div>
+             <div><kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">T</kbd> Focus tag input</div>
+             <div><kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">?</kbd> Toggle this panel</div>
+           </div>
+         </div>
+       )}
 
        <div className="flex-1 relative overflow-hidden">
          <AnimatePresence mode="wait">
@@ -479,6 +602,7 @@ export default function Review() {
                     )}
                     <div className="flex gap-1">
                       <Input 
+                        ref={tagInputRef}
                         value={newTag}
                         onChange={(e) => setNewTag(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomTag(); }}}
@@ -489,6 +613,45 @@ export default function Review() {
                       <Button type="button" variant="outline" size="icon" onClick={addCustomTag} className="h-6 w-6" data-testid="button-review-add-tag">
                         <Plus className="w-3 h-3" />
                       </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fields Checked + Verification Method */}
+              <div className="px-4 py-2 border-t border-border bg-muted/5">
+                <div className="flex items-start gap-6 flex-wrap">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground font-semibold uppercase block mb-1.5">Fields Checked</span>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {FIELDS_TO_CHECK.map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-1.5 cursor-pointer" data-testid={`checkbox-field-${key}`}>
+                          <Checkbox
+                            checked={!!fieldsChecked[key]}
+                            onCheckedChange={() => toggleFieldCheck(key)}
+                          />
+                          <span className="text-xs text-muted-foreground">{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground font-semibold uppercase block mb-1.5">Method</span>
+                    <div className="flex gap-1">
+                      {["website_check", "phone_call", "email", "in_person"].map(method => (
+                        <button
+                          key={method}
+                          onClick={() => setVerificationMethod(method)}
+                          data-testid={`button-method-${method}`}
+                          className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                            verificationMethod === method
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-muted/40 text-muted-foreground border-border hover:bg-muted'
+                          }`}
+                        >
+                          {method.replace(/_/g, ' ')}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -504,17 +667,27 @@ export default function Review() {
                     <Button 
                       variant="outline" 
                       className="border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
-                      onClick={() => updateStatus("missing_info")}
+                      onClick={() => updateStatus("needs_info")}
                       data-testid="button-flag-missing"
                     >
-                       <AlertOctagon className="mr-2 w-4 h-4" /> Missing Info
+                       <AlertOctagon className="mr-2 w-4 h-4" /> Needs Info <kbd className="ml-1 text-[9px] opacity-50">M</kbd>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="border-red-200 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+                      onClick={() => updateStatus("closed")}
+                      data-testid="button-close"
+                    >
+                       <XCircle className="mr-2 w-4 h-4" /> Closed <kbd className="ml-1 text-[9px] opacity-50">C</kbd>
                     </Button>
                     <Button 
                       className="bg-green-600 text-white"
                       onClick={() => updateStatus("verified")}
+                      disabled={!hasCheckedFields}
                       data-testid="button-verify"
+                      title={!hasCheckedFields ? "Check at least one field before verifying" : "Mark as verified"}
                     >
-                       <CheckCircle className="mr-2 w-4 h-4" /> Verified
+                       <CheckCircle className="mr-2 w-4 h-4" /> Verified <kbd className="ml-1 text-[9px] opacity-50">V</kbd>
                     </Button>
                  </div>
 

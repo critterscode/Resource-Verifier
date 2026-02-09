@@ -148,7 +148,9 @@ export function ResourceForm({ initialData, onSubmit, isSubmitting, onCancel }: 
                   <SelectContent>
                     <SelectItem value="unverified">Unverified</SelectItem>
                     <SelectItem value="verified">Verified</SelectItem>
-                    <SelectItem value="missing_info">Missing Info</SelectItem>
+                    <SelectItem value="needs_info">Needs Info</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                    <SelectItem value="limited">Limited</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
