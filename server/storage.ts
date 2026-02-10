@@ -7,6 +7,7 @@ import {
   verificationEvents,
   managedTags,
   managedCategories,
+  signalItems,
   type Resource,
   type InsertResource,
   type UpdateResourceRequest,
@@ -18,6 +19,8 @@ import {
   type InsertManagedTag,
   type ManagedCategory,
   type InsertManagedCategory,
+  type SignalItem,
+  type InsertSignalItem,
 } from "@shared/schema";
 import { eq, ilike, desc, and, inArray, sql, ne } from "drizzle-orm";
 
@@ -62,6 +65,14 @@ export interface IStorage {
   createList(list: InsertList): Promise<List>;
   addResourceToList(listId: number, resourceId: number): Promise<void>;
   removeResourceFromList(listId: number, resourceId: number): Promise<void>;
+
+  // Signal Items
+  getSignalItems(filters?: { type?: string; lane?: string; search?: string; limit?: number; offset?: number }): Promise<SignalItem[]>;
+  getSignalItemCount(filters?: { type?: string; lane?: string; search?: string }): Promise<number>;
+  getSignalItem(id: number): Promise<SignalItem | undefined>;
+  createSignalItem(item: InsertSignalItem): Promise<SignalItem>;
+  updateSignalItem(id: number, updates: Partial<InsertSignalItem>): Promise<SignalItem>;
+  deleteSignalItem(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -339,6 +350,69 @@ export class DatabaseStorage implements IStorage {
         eq(listItems.listId, listId),
         eq(listItems.resourceId, resourceId)
       ));
+  }
+
+  // === Signal Items ===
+
+  private buildSignalConditions(filters?: { type?: string; lane?: string; search?: string }) {
+    const conditions = [];
+    if (filters?.type) {
+      conditions.push(eq(signalItems.type, filters.type as any));
+    }
+    if (filters?.lane) {
+      conditions.push(eq(signalItems.lane, filters.lane as any));
+    }
+    if (filters?.search) {
+      conditions.push(ilike(signalItems.title, `%${filters.search}%`));
+    }
+    return conditions;
+  }
+
+  async getSignalItems(filters?: { type?: string; lane?: string; search?: string; limit?: number; offset?: number }): Promise<SignalItem[]> {
+    const conditions = this.buildSignalConditions(filters);
+    let query = db.select()
+      .from(signalItems)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(signalItems.createdAt));
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset) as any;
+    }
+
+    return await query;
+  }
+
+  async getSignalItemCount(filters?: { type?: string; lane?: string; search?: string }): Promise<number> {
+    const conditions = this.buildSignalConditions(filters);
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(signalItems)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    return result[0]?.count ?? 0;
+  }
+
+  async getSignalItem(id: number): Promise<SignalItem | undefined> {
+    const [item] = await db.select().from(signalItems).where(eq(signalItems.id, id));
+    return item;
+  }
+
+  async createSignalItem(item: InsertSignalItem): Promise<SignalItem> {
+    const [newItem] = await db.insert(signalItems).values(item).returning();
+    return newItem;
+  }
+
+  async updateSignalItem(id: number, updates: Partial<InsertSignalItem>): Promise<SignalItem> {
+    const [updated] = await db.update(signalItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(signalItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSignalItem(id: number): Promise<void> {
+    await db.delete(signalItems).where(eq(signalItems.id, id));
   }
 }
 

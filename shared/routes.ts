@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { insertResourceSchema, insertListSchema, insertVerificationEventSchema, insertManagedTagSchema, insertManagedCategorySchema } from './schema';
+import { insertResourceSchema, insertListSchema, insertVerificationEventSchema, insertManagedTagSchema, insertManagedCategorySchema, insertSignalItemSchema } from './schema';
 
 // ============================================
 // SHARED ERROR SCHEMAS
@@ -135,6 +135,41 @@ export const api = {
     categories: {
       method: 'GET' as const,
       path: '/api/public/categories' as const,
+    },
+  },
+  signals: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/signals' as const,
+      input: z.object({
+        type: z.enum(["closure", "capacity", "policy", "event", "alert", "rumor"]).optional(),
+        lane: z.enum(["action", "noise"]).optional(),
+        search: z.string().optional(),
+        limit: z.string().transform(Number).optional(),
+        offset: z.string().transform(Number).optional(),
+      }).optional(),
+    },
+    count: {
+      method: 'GET' as const,
+      path: '/api/signals/count' as const,
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/signals/:id' as const,
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/signals' as const,
+      input: insertSignalItemSchema,
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/signals/:id' as const,
+      input: insertSignalItemSchema.partial(),
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/signals/:id' as const,
     },
   },
   lists: {

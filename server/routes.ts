@@ -294,6 +294,85 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // === Signal Items ===
+
+  app.get(api.signals.list.path, async (req, res) => {
+    try {
+      const filters = {
+        type: req.query.type as string,
+        lane: req.query.lane as string,
+        search: req.query.search as string,
+        limit: req.query.limit ? Number(req.query.limit) : 50,
+        offset: req.query.offset ? Number(req.query.offset) : undefined,
+      };
+      const items = await storage.getSignalItems(filters);
+      res.json(items);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.signals.count.path, async (req, res) => {
+    try {
+      const filters = {
+        type: req.query.type as string,
+        lane: req.query.lane as string,
+        search: req.query.search as string,
+      };
+      const count = await storage.getSignalItemCount(filters);
+      res.json({ count });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.signals.get.path, async (req, res) => {
+    const item = await storage.getSignalItem(Number(req.params.id));
+    if (!item) {
+      return res.status(404).json({ message: 'Signal not found' });
+    }
+    res.json(item);
+  });
+
+  app.post(api.signals.create.path, async (req, res) => {
+    try {
+      const input = api.signals.create.input.parse(req.body);
+      const item = await storage.createSignalItem(input);
+      res.status(201).json(item);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.put(api.signals.update.path, async (req, res) => {
+    try {
+      const input = api.signals.update.input.parse(req.body);
+      const item = await storage.updateSignalItem(Number(req.params.id), input);
+      res.json(item);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.signals.delete.path, async (req, res) => {
+    await storage.deleteSignalItem(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // === Public API ===
 
   app.get(api.public.resources.path, async (req, res) => {
