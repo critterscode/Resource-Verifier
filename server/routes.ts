@@ -373,6 +373,184 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // === Providers ===
+
+  app.post(api.providers.lookup.path, async (req, res) => {
+    try {
+      const { email } = api.providers.lookup.input.parse(req.body);
+      const provider = await storage.getProviderByEmail(email.toLowerCase());
+      if (!provider) {
+        return res.status(404).json({ message: "No provider found with that email" });
+      }
+      res.json(provider);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.providers.register.path, async (req, res) => {
+    try {
+      const input = api.providers.register.input.parse(req.body);
+      const existing = await storage.getProviderByEmail((input.email || "").toLowerCase());
+      if (existing) {
+        return res.status(409).json({ message: "A provider with that email already exists" });
+      }
+      const provider = await storage.createProvider({ ...input, email: (input.email || "").toLowerCase() });
+      res.status(201).json(provider);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/providers/:id/resources', async (req, res) => {
+    try {
+      const providerId = Number(req.params.id);
+      const provider = await storage.getProvider(providerId);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider not found" });
+      }
+      const providerResources = await storage.getResourcesByProviderId(providerId);
+      res.json(providerResources);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/providers/:id/update-requests', async (req, res) => {
+    try {
+      const providerId = Number(req.params.id);
+      const provider = await storage.getProvider(providerId);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider not found" });
+      }
+      const requests = await storage.getUpdateRequests({ submittedBy: provider.email || "" });
+      res.json(requests);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // === Update Requests ===
+
+  app.get(api.updateRequests.list.path, async (req, res) => {
+    try {
+      const filters = {
+        status: req.query.status as string,
+        limit: req.query.limit ? Number(req.query.limit) : 50,
+        offset: req.query.offset ? Number(req.query.offset) : undefined,
+      };
+      const requests = await storage.getUpdateRequests(filters);
+      res.json(requests);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.updateRequests.count.path, async (req, res) => {
+    try {
+      const filters = {
+        status: req.query.status as string,
+      };
+      const count = await storage.getUpdateRequestCount(filters);
+      res.json({ count });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/update-requests/:id', async (req, res) => {
+    try {
+      const request = await storage.getUpdateRequest(Number(req.params.id));
+      if (!request) {
+        return res.status(404).json({ message: "Update request not found" });
+      }
+      res.json(request);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.updateRequests.create.path, async (req, res) => {
+    try {
+      const input = api.updateRequests.create.input.parse(req.body);
+      const request = await storage.createUpdateRequest(input);
+      res.status(201).json(request);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post('/api/update-requests/:id/accept', async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const request = await storage.getUpdateRequest(id);
+      if (!request) {
+        return res.status(404).json({ message: "Update request not found" });
+      }
+      if (request.status !== "new" && request.status !== "in_review") {
+        return res.status(400).json({ message: "Request already processed" });
+      }
+
+      const proposedChanges = request.proposedChanges as Record<string, any>;
+      if (request.resourceId && proposedChanges) {
+        await storage.updateResource(request.resourceId, {
+          ...proposedChanges,
+          lastVerifiedAt: new Date(),
+        });
+
+        await storage.createVerificationEvent({
+          resourceId: request.resourceId,
+          performedByRole: "provider",
+          method: "provider_update",
+          result: "verified",
+          notes: `Provider update accepted. Changes: ${Object.keys(proposedChanges).join(", ")}`,
+        });
+      }
+
+      const updated = await storage.updateUpdateRequestStatus(id, "accepted", "staff");
+      res.json(updated);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post('/api/update-requests/:id/reject', async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const request = await storage.getUpdateRequest(id);
+      if (!request) {
+        return res.status(404).json({ message: "Update request not found" });
+      }
+      if (request.status !== "new" && request.status !== "in_review") {
+        return res.status(400).json({ message: "Request already processed" });
+      }
+
+      const updated = await storage.updateUpdateRequestStatus(id, "rejected", "staff");
+      res.json(updated);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // === Public API ===
 
   app.get(api.public.resources.path, async (req, res) => {

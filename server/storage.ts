@@ -8,6 +8,9 @@ import {
   managedTags,
   managedCategories,
   signalItems,
+  providers,
+  updateRequests,
+  receipts,
   type Resource,
   type InsertResource,
   type UpdateResourceRequest,
@@ -21,6 +24,12 @@ import {
   type InsertManagedCategory,
   type SignalItem,
   type InsertSignalItem,
+  type Provider,
+  type InsertProvider,
+  type UpdateRequest,
+  type InsertUpdateRequest,
+  type Receipt,
+  type InsertReceipt,
 } from "@shared/schema";
 import { eq, ilike, desc, and, inArray, sql, ne } from "drizzle-orm";
 
@@ -73,6 +82,22 @@ export interface IStorage {
   createSignalItem(item: InsertSignalItem): Promise<SignalItem>;
   updateSignalItem(id: number, updates: Partial<InsertSignalItem>): Promise<SignalItem>;
   deleteSignalItem(id: number): Promise<void>;
+
+  // Providers
+  getProviderByEmail(email: string): Promise<Provider | undefined>;
+  getProvider(id: number): Promise<Provider | undefined>;
+  createProvider(provider: InsertProvider): Promise<Provider>;
+  getResourcesByProviderId(providerId: number): Promise<Resource[]>;
+
+  // Update Requests
+  getUpdateRequests(filters?: { status?: string; resourceId?: number; submittedBy?: string; limit?: number; offset?: number }): Promise<(UpdateRequest & { resourceName?: string })[]>;
+  getUpdateRequestCount(filters?: { status?: string }): Promise<number>;
+  getUpdateRequest(id: number): Promise<(UpdateRequest & { resourceName?: string }) | undefined>;
+  createUpdateRequest(request: InsertUpdateRequest): Promise<UpdateRequest>;
+  updateUpdateRequestStatus(id: number, status: string, reviewedByUserId?: string): Promise<UpdateRequest>;
+
+  // Receipts
+  createReceipt(receipt: InsertReceipt): Promise<Receipt>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -413,6 +438,121 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSignalItem(id: number): Promise<void> {
     await db.delete(signalItems).where(eq(signalItems.id, id));
+  }
+
+  // === Providers ===
+
+  async getProviderByEmail(email: string): Promise<Provider | undefined> {
+    const [provider] = await db.select().from(providers).where(eq(providers.email, email));
+    return provider;
+  }
+
+  async getProvider(id: number): Promise<Provider | undefined> {
+    const [provider] = await db.select().from(providers).where(eq(providers.id, id));
+    return provider;
+  }
+
+  async createProvider(provider: InsertProvider): Promise<Provider> {
+    const [newProvider] = await db.insert(providers).values(provider).returning();
+    return newProvider;
+  }
+
+  async getResourcesByProviderId(providerId: number): Promise<Resource[]> {
+    return await db.select().from(resources).where(eq(resources.providerId, providerId)).orderBy(resources.name);
+  }
+
+  // === Update Requests ===
+
+  async getUpdateRequests(filters?: { status?: string; resourceId?: number; submittedBy?: string; limit?: number; offset?: number }): Promise<(UpdateRequest & { resourceName?: string })[]> {
+    const conditions = [];
+    if (filters?.status) {
+      conditions.push(eq(updateRequests.status, filters.status as any));
+    }
+    if (filters?.resourceId) {
+      conditions.push(eq(updateRequests.resourceId, filters.resourceId));
+    }
+    if (filters?.submittedBy) {
+      conditions.push(eq(updateRequests.submittedBy, filters.submittedBy));
+    }
+
+    let query = db.select({
+      id: updateRequests.id,
+      resourceId: updateRequests.resourceId,
+      submittedBy: updateRequests.submittedBy,
+      proposedChanges: updateRequests.proposedChanges,
+      notes: updateRequests.notes,
+      evidenceLink: updateRequests.evidenceLink,
+      status: updateRequests.status,
+      reviewedByUserId: updateRequests.reviewedByUserId,
+      createdAt: updateRequests.createdAt,
+      updatedAt: updateRequests.updatedAt,
+      resourceName: resources.name,
+    })
+      .from(updateRequests)
+      .leftJoin(resources, eq(updateRequests.resourceId, resources.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(updateRequests.createdAt));
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset) as any;
+    }
+
+    const rows = await query;
+    return rows.map(r => ({ ...r, resourceName: r.resourceName ?? undefined }));
+  }
+
+  async getUpdateRequestCount(filters?: { status?: string }): Promise<number> {
+    const conditions = [];
+    if (filters?.status) {
+      conditions.push(eq(updateRequests.status, filters.status as any));
+    }
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(updateRequests)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    return result[0]?.count ?? 0;
+  }
+
+  async getUpdateRequest(id: number): Promise<(UpdateRequest & { resourceName?: string }) | undefined> {
+    const [request] = await db.select({
+      id: updateRequests.id,
+      resourceId: updateRequests.resourceId,
+      submittedBy: updateRequests.submittedBy,
+      proposedChanges: updateRequests.proposedChanges,
+      notes: updateRequests.notes,
+      evidenceLink: updateRequests.evidenceLink,
+      status: updateRequests.status,
+      reviewedByUserId: updateRequests.reviewedByUserId,
+      createdAt: updateRequests.createdAt,
+      updatedAt: updateRequests.updatedAt,
+      resourceName: resources.name,
+    })
+      .from(updateRequests)
+      .leftJoin(resources, eq(updateRequests.resourceId, resources.id))
+      .where(eq(updateRequests.id, id));
+    return request ? { ...request, resourceName: request.resourceName ?? undefined } : undefined;
+  }
+
+  async createUpdateRequest(request: InsertUpdateRequest): Promise<UpdateRequest> {
+    const [newRequest] = await db.insert(updateRequests).values(request).returning();
+    return newRequest;
+  }
+
+  async updateUpdateRequestStatus(id: number, status: string, reviewedByUserId?: string): Promise<UpdateRequest> {
+    const [updated] = await db.update(updateRequests)
+      .set({ status: status as any, reviewedByUserId, updatedAt: new Date() })
+      .where(eq(updateRequests.id, id))
+      .returning();
+    return updated;
+  }
+
+  // === Receipts ===
+
+  async createReceipt(receipt: InsertReceipt): Promise<Receipt> {
+    const [newReceipt] = await db.insert(receipts).values(receipt).returning();
+    return newReceipt;
   }
 }
 

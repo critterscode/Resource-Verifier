@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { insertResourceSchema, insertListSchema, insertVerificationEventSchema, insertManagedTagSchema, insertManagedCategorySchema, insertSignalItemSchema } from './schema';
+import { insertResourceSchema, insertListSchema, insertVerificationEventSchema, insertManagedTagSchema, insertManagedCategorySchema, insertSignalItemSchema, insertUpdateRequestSchema, insertProviderSchema } from './schema';
 
 // ============================================
 // SHARED ERROR SCHEMAS
@@ -170,6 +170,58 @@ export const api = {
     delete: {
       method: 'DELETE' as const,
       path: '/api/signals/:id' as const,
+    },
+  },
+  providers: {
+    lookup: {
+      method: 'POST' as const,
+      path: '/api/providers/lookup' as const,
+      input: z.object({ email: z.string().email() }),
+    },
+    register: {
+      method: 'POST' as const,
+      path: '/api/providers/register' as const,
+      input: insertProviderSchema,
+    },
+    resources: {
+      method: 'GET' as const,
+      path: '/api/providers/:id/resources' as const,
+    },
+    updateRequests: {
+      method: 'GET' as const,
+      path: '/api/providers/:id/update-requests' as const,
+    },
+  },
+  updateRequests: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/update-requests' as const,
+      input: z.object({
+        status: z.enum(["new", "in_review", "accepted", "rejected"]).optional(),
+        limit: z.string().transform(Number).optional(),
+        offset: z.string().transform(Number).optional(),
+      }).optional(),
+    },
+    count: {
+      method: 'GET' as const,
+      path: '/api/update-requests/count' as const,
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/update-requests/:id' as const,
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/update-requests' as const,
+      input: insertUpdateRequestSchema,
+    },
+    accept: {
+      method: 'POST' as const,
+      path: '/api/update-requests/:id/accept' as const,
+    },
+    reject: {
+      method: 'POST' as const,
+      path: '/api/update-requests/:id/reject' as const,
     },
   },
   lists: {
