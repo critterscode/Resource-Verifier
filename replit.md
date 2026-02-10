@@ -55,6 +55,19 @@ The frontend lives in `client/src/` with pages in `pages/`, reusable components 
 - `collection_items` — Join table linking collections to resources
 
 ### Recent Changes (Feb 2026)
+- **Milestone 5**: Provider Self-Service Mode
+  - Provider Portal at /provider (public-facing, no admin sidebar)
+  - Email-based provider lookup (no auth system, simple email lookup)
+  - Provider registration for new organizations
+  - View linked resources and propose update requests with evidence links
+  - Admin Update Queue at /updates (admin page with sidebar)
+  - Queue shows pending update requests with status filtering (new/in_review/accepted/rejected)
+  - Side-by-side diff view comparing current vs proposed changes
+  - Accept action applies changes to resource + logs verification event (role=provider, method=provider_update)
+  - Reject action marks request as rejected
+  - API: POST /api/providers/lookup, POST /api/providers/register, GET /api/providers/:id/resources, GET /api/providers/:id/update-requests
+  - API: GET/POST /api/update-requests, GET /api/update-requests/:id, POST /api/update-requests/:id/accept, POST /api/update-requests/:id/reject
+  - Tables: providers, update_requests, receipts (already in schema)
 - **Milestone 4**: Local Signal Feed at /signals
   - Two-lane board: Action Required vs Noise/Low Priority
   - Signal types: closure, capacity, policy, event, alert, rumor

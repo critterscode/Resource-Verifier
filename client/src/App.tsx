@@ -12,7 +12,9 @@ import Lists from "@/pages/Lists";
 import ListDetails from "@/pages/ListDetails";
 import XOClusters from "@/pages/XOClusters";
 import SignalFeed from "@/pages/SignalFeed";
+import UpdateQueue from "@/pages/UpdateQueue";
 import PublicSearch from "@/pages/PublicSearch";
+import ProviderPortal from "@/pages/ProviderPortal";
 import NotFound from "@/pages/not-found";
 
 function AdminLayout() {
@@ -27,6 +29,7 @@ function AdminLayout() {
             <Route path="/review" component={Review} />
             <Route path="/clusters" component={XOClusters} />
             <Route path="/signals" component={SignalFeed} />
+            <Route path="/updates" component={UpdateQueue} />
             <Route path="/lists" component={Lists} />
             <Route path="/lists/:id" component={ListDetails} />
             <Route component={NotFound} />
@@ -43,6 +46,10 @@ function Router() {
 
   if (location === "/search" || location.startsWith("/search?")) {
     return <PublicSearch />;
+  }
+
+  if (location === "/provider" || location.startsWith("/provider?")) {
+    return <ProviderPortal />;
   }
 
   return <AdminLayout />;
