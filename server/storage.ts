@@ -23,8 +23,8 @@ import { eq, ilike, desc, and, inArray, sql, ne } from "drizzle-orm";
 
 export interface IStorage {
   // Resources
-  getResources(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean; limit?: number; offset?: number }): Promise<Resource[]>;
-  getResourceCount(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean }): Promise<number>;
+  getResources(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean; tag?: string; limit?: number; offset?: number }): Promise<Resource[]>;
+  getResourceCount(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean; tag?: string }): Promise<number>;
   getResource(id: number): Promise<Resource | undefined>;
   createResource(resource: InsertResource): Promise<Resource>;
   updateResource(id: number, updates: UpdateResourceRequest): Promise<Resource>;
@@ -67,7 +67,7 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // === Resources ===
 
-  private buildResourceConditions(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean }) {
+  private buildResourceConditions(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean; tag?: string }) {
     const conditions = [];
     if (filters?.search) {
       conditions.push(ilike(resources.name, `%${filters.search}%`));
@@ -81,10 +81,13 @@ export class DatabaseStorage implements IStorage {
     if (filters?.isFavorite !== undefined) {
       conditions.push(eq(resources.isFavorite, filters.isFavorite));
     }
+    if (filters?.tag) {
+      conditions.push(sql`${resources.tags} @> ARRAY[${filters.tag}]::text[]`);
+    }
     return conditions;
   }
 
-  async getResources(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean; limit?: number; offset?: number }): Promise<Resource[]> {
+  async getResources(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean; tag?: string; limit?: number; offset?: number }): Promise<Resource[]> {
     const conditions = this.buildResourceConditions(filters);
 
     let query = db.select()
@@ -102,7 +105,7 @@ export class DatabaseStorage implements IStorage {
     return await query;
   }
 
-  async getResourceCount(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean }): Promise<number> {
+  async getResourceCount(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean; tag?: string }): Promise<number> {
     const conditions = this.buildResourceConditions(filters);
     const result = await db.select({ count: sql<number>`count(*)::int` })
       .from(resources)

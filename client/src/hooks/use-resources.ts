@@ -3,7 +3,7 @@ import { api, buildUrl } from "@shared/routes";
 import type { InsertResource, UpdateResourceRequest, InsertVerificationEvent } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
-export function useResources(filters?: { search?: string; category?: string; status?: "unverified" | "verified" | "needs_info" | "closed" | "limited"; isFavorite?: boolean; limit?: number; offset?: number }) {
+export function useResources(filters?: { search?: string; category?: string; status?: "unverified" | "verified" | "needs_info" | "closed" | "limited"; isFavorite?: boolean; tag?: string; limit?: number; offset?: number }) {
   const queryParams: Record<string, any> = { ...filters };
   if (filters?.isFavorite !== undefined) {
     queryParams.isFavorite = String(filters.isFavorite);
@@ -30,7 +30,7 @@ export function useResources(filters?: { search?: string; category?: string; sta
   });
 }
 
-export function useResourceCount(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean }) {
+export function useResourceCount(filters?: { search?: string; category?: string; status?: string; isFavorite?: boolean; tag?: string }) {
   const queryParams: Record<string, any> = { ...filters };
   Object.keys(queryParams).forEach(key => queryParams[key] === undefined && delete queryParams[key]);
   const queryString = new URLSearchParams(queryParams).toString();

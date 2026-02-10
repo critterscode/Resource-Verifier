@@ -1,11 +1,12 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Database, CheckSquare, ListMusic, LogOut, Settings } from "lucide-react";
+import { LayoutDashboard, Database, CheckSquare, ListMusic, LogOut, Settings, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Resources", href: "/resources", icon: Database },
   { label: "Review Mode", href: "/review", icon: CheckSquare },
+  { label: "XO Clusters", href: "/clusters", icon: Layers },
   { label: "My Lists", href: "/lists", icon: ListMusic },
 ];
 

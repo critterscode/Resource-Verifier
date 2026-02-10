@@ -21,6 +21,7 @@ export async function registerRoutes(
         category: req.query.category as string,
         status: req.query.status as string,
         isFavorite: req.query.isFavorite === 'true' ? true : undefined,
+        tag: req.query.tag as string,
         limit: req.query.limit ? Number(req.query.limit) : undefined,
         offset: req.query.offset ? Number(req.query.offset) : undefined,
       };
@@ -40,9 +41,29 @@ export async function registerRoutes(
         category: req.query.category as string,
         status: req.query.status as string,
         isFavorite: req.query.isFavorite === 'true' ? true : undefined,
+        tag: req.query.tag as string,
       };
       const count = await storage.getResourceCount(filters);
       res.json({ count });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/resources/status-counts', async (req, res) => {
+    try {
+      const filters = {
+        search: req.query.search as string,
+        category: req.query.category as string,
+        tag: req.query.tag as string,
+      };
+      const statuses = ["unverified", "verified", "needs_info", "closed", "limited"] as const;
+      const counts: Record<string, number> = {};
+      for (const status of statuses) {
+        counts[status] = await storage.getResourceCount({ ...filters, status });
+      }
+      res.json(counts);
     } catch (e) {
       console.error(e);
       res.status(500).json({ message: "Internal server error" });

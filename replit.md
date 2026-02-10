@@ -26,6 +26,7 @@ The frontend lives in `client/src/` with pages in `pages/`, reusable components 
 - `/` — Dashboard with stats overview
 - `/resources` — Full resource list with search, filter, CRUD, bulk operations, pagination (50/page)
 - `/review` — Card-by-card review mode for verifying resources with keyboard shortcuts
+- `/clusters` — XO Clusters visual triage board with status lanes (batch status changes, detail panel)
 - `/lists` — Collection management
 - `/lists/:id` — Collection detail with print support
 
@@ -54,6 +55,15 @@ The frontend lives in `client/src/` with pages in `pages/`, reusable components 
 - `collection_items` — Join table linking collections to resources
 
 ### Recent Changes (Feb 2026)
+- **Milestone 3**: XO Clusters visual triage interface at /clusters
+  - Status-lane board layout: Unverified, Needs Info, Verified, Limited, Closed columns
+  - Resource cards with confidence scores, missing field indicators, tag badges
+  - Search/category/tag filtering across all lanes
+  - Checkbox selection with batch status change operations
+  - Resource detail dialog with quick triage actions
+  - New API: GET /api/resources/status-counts (per-status counts with filters)
+  - Tag filtering added to admin getResources/getResourceCount
+  - Separate from map UI (non-negotiable architecture requirement)
 - **Milestone 2**: Public-facing LaneHelp search site at /search
   - Public API: GET /api/public/resources, /count, /categories, /tags, /:id
   - Excludes closed resources, hides internal fields (internalNotes, isFavorite, etc.)
