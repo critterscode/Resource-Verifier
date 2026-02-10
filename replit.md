@@ -22,12 +22,15 @@ Preferred communication style: Simple, everyday language.
 
 The frontend lives in `client/src/` with pages in `pages/`, reusable components in `components/`, custom hooks in `hooks/`, and utility functions in `lib/`. Path aliases are configured: `@/` maps to `client/src/`, `@shared/` maps to `shared/`.
 
-**Key Pages**:
+**Key Pages (Admin)**:
 - `/` — Dashboard with stats overview
-- `/resources` — Full resource list with search, filter, CRUD operations
-- `/review` — Card-by-card review mode for verifying resources
+- `/resources` — Full resource list with search, filter, CRUD, bulk operations, pagination (50/page)
+- `/review` — Card-by-card review mode for verifying resources with keyboard shortcuts
 - `/lists` — Collection management
 - `/lists/:id` — Collection detail with print support
+
+**Public Pages (LaneHelp)**:
+- `/search` — Public-facing resource search with map, filters, verified badges (no admin sidebar)
 
 ### Backend
 - **Runtime**: Node.js with Express 5
@@ -51,14 +54,19 @@ The frontend lives in `client/src/` with pages in `pages/`, reusable components 
 - `collection_items` — Join table linking collections to resources
 
 ### Recent Changes (Feb 2026)
-- Added new fields from Excel import: email, accessInfo, eligibility, serviceArea, tags, categories
-- Resource names are clickable Google search links (target=_blank)
-- Websites are clickable with auto https:// prefix
-- Quick-select tag UI in ResourceForm and Review mode
-- Reusable category picker with max-2 limit in ResourceForm
+- **Milestone 2**: Public-facing LaneHelp search site at /search
+  - Public API: GET /api/public/resources, /count, /categories, /tags, /:id
+  - Excludes closed resources, hides internal fields (internalNotes, isFavorite, etc.)
+  - Leaflet map with OpenStreetMap tiles (markers appear when lat/lng data added)
+  - Resource cards with verified badges, search + category + tag filters
+  - Resource detail dialog with full contact info, services, eligibility, hours
+  - Separate layout from admin (no sidebar)
+- **Milestone 1**: Admin ResourceHub with verification tracking and bulk operations
+  - Pagination (50/page) with server-side limit/offset
+  - Bulk selection + status/tag operations
+  - Review mode with keyboard shortcuts and verification events
+  - CSV export with all fields
 - Tags endpoint: GET /api/tags returns all unique tags
-- CSV export includes all fields
-- Print layout includes all fields (access, eligibility, service area)
 - Data-testid attributes on all interactive elements
 
 ### Storage Layer
@@ -80,6 +88,7 @@ The frontend lives in `client/src/` with pages in `pages/`, reusable components 
 - **express** v5 — HTTP server
 - **zod** — Runtime schema validation (shared between client and server)
 - **xlsx** — Excel file import/export support
+- **leaflet** + **react-leaflet** v4.2.1 — Map integration for public search (OpenStreetMap tiles)
 - **framer-motion** — Animation library for review card transitions
 - **@tanstack/react-query** — Async state management
 - **wouter** — Client-side routing

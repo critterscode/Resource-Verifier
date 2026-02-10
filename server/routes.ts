@@ -273,6 +273,58 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // === Public API ===
+
+  app.get(api.public.resources.path, async (req, res) => {
+    try {
+      const filters = {
+        search: req.query.search as string,
+        category: req.query.category as string,
+        tag: req.query.tag as string,
+        limit: req.query.limit ? Number(req.query.limit) : 50,
+        offset: req.query.offset ? Number(req.query.offset) : undefined,
+      };
+      const resources = await storage.getPublicResources(filters);
+      res.json(resources);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.public.count.path, async (req, res) => {
+    try {
+      const filters = {
+        search: req.query.search as string,
+        category: req.query.category as string,
+        tag: req.query.tag as string,
+      };
+      const count = await storage.getPublicResourceCount(filters);
+      res.json({ count });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.public.categories.path, async (_req, res) => {
+    const categories = await storage.getAllCategories();
+    res.json(categories);
+  });
+
+  app.get('/api/public/tags', async (_req, res) => {
+    const tags = await storage.getAllTags();
+    res.json(tags);
+  });
+
+  app.get('/api/public/resources/:id', async (req, res) => {
+    const resource = await storage.getPublicResource(Number(req.params.id));
+    if (!resource) {
+      return res.status(404).json({ message: 'Resource not found' });
+    }
+    res.json(resource);
+  });
+
   // === Seed Data ===
   await seedFromExcel();
 

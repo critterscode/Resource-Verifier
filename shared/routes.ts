@@ -119,6 +119,24 @@ export const api = {
       path: '/api/managed-categories/:id' as const,
     },
   },
+  public: {
+    resources: {
+      method: 'GET' as const,
+      path: '/api/public/resources' as const,
+    },
+    count: {
+      method: 'GET' as const,
+      path: '/api/public/resources/count' as const,
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/public/resources/:id' as const,
+    },
+    categories: {
+      method: 'GET' as const,
+      path: '/api/public/categories' as const,
+    },
+  },
   lists: {
     list: {
       method: 'GET' as const,

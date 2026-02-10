@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -10,9 +10,10 @@ import Resources from "@/pages/Resources";
 import Review from "@/pages/Review";
 import Lists from "@/pages/Lists";
 import ListDetails from "@/pages/ListDetails";
+import PublicSearch from "@/pages/PublicSearch";
 import NotFound from "@/pages/not-found";
 
-function Router() {
+function AdminLayout() {
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
       <Sidebar />
@@ -31,6 +32,16 @@ function Router() {
       <MobileNav />
     </div>
   );
+}
+
+function Router() {
+  const [location] = useLocation();
+
+  if (location === "/search" || location.startsWith("/search?")) {
+    return <PublicSearch />;
+  }
+
+  return <AdminLayout />;
 }
 
 function App() {

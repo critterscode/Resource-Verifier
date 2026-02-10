@@ -19,7 +19,7 @@ import {
   type ManagedCategory,
   type InsertManagedCategory,
 } from "@shared/schema";
-import { eq, ilike, desc, and, inArray, sql } from "drizzle-orm";
+import { eq, ilike, desc, and, inArray, sql, ne } from "drizzle-orm";
 
 export interface IStorage {
   // Resources
@@ -50,6 +50,11 @@ export interface IStorage {
   // Verification Events
   getVerificationEvents(resourceId: number): Promise<VerificationEvent[]>;
   createVerificationEvent(event: InsertVerificationEvent): Promise<VerificationEvent>;
+
+  // Public API
+  getPublicResources(filters?: { search?: string; category?: string; tag?: string; limit?: number; offset?: number }): Promise<Partial<Resource>[]>;
+  getPublicResourceCount(filters?: { search?: string; category?: string; tag?: string }): Promise<number>;
+  getPublicResource(id: number): Promise<Partial<Resource> | undefined>;
 
   // Lists (formerly collections)
   getLists(): Promise<List[]>;
@@ -205,6 +210,82 @@ export class DatabaseStorage implements IStorage {
   async createVerificationEvent(event: InsertVerificationEvent): Promise<VerificationEvent> {
     const [newEvent] = await db.insert(verificationEvents).values(event).returning();
     return newEvent;
+  }
+
+  // === Public API ===
+
+  private publicColumns = {
+    id: resources.id,
+    name: resources.name,
+    description: resources.description,
+    category: resources.category,
+    categories: resources.categories,
+    tags: resources.tags,
+    status: resources.status,
+    address: resources.address,
+    city: resources.city,
+    state: resources.state,
+    zip: resources.zip,
+    lat: resources.lat,
+    lng: resources.lng,
+    serviceArea: resources.serviceArea,
+    phone: resources.phone,
+    email: resources.email,
+    website: resources.website,
+    services: resources.services,
+    hours: resources.hours,
+    eligibility: resources.eligibility,
+    accessInfo: resources.accessInfo,
+    languages: resources.languages,
+    publicNotes: resources.publicNotes,
+    confidenceScore: resources.confidenceScore,
+    lastVerifiedAt: resources.lastVerifiedAt,
+  };
+
+  private buildPublicConditions(filters?: { search?: string; category?: string; tag?: string }) {
+    const conditions = [ne(resources.status, "closed")];
+    if (filters?.search) {
+      conditions.push(ilike(resources.name, `%${filters.search}%`));
+    }
+    if (filters?.category) {
+      conditions.push(eq(resources.category, filters.category));
+    }
+    if (filters?.tag) {
+      conditions.push(sql`${resources.tags} @> ARRAY[${filters.tag}]::text[]`);
+    }
+    return conditions;
+  }
+
+  async getPublicResources(filters?: { search?: string; category?: string; tag?: string; limit?: number; offset?: number }): Promise<Partial<Resource>[]> {
+    const conditions = this.buildPublicConditions(filters);
+    let query = db.select(this.publicColumns)
+      .from(resources)
+      .where(and(...conditions))
+      .orderBy(resources.name);
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset) as any;
+    }
+
+    return await query;
+  }
+
+  async getPublicResourceCount(filters?: { search?: string; category?: string; tag?: string }): Promise<number> {
+    const conditions = this.buildPublicConditions(filters);
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(resources)
+      .where(and(...conditions));
+    return result[0]?.count ?? 0;
+  }
+
+  async getPublicResource(id: number): Promise<Partial<Resource> | undefined> {
+    const [resource] = await db.select(this.publicColumns)
+      .from(resources)
+      .where(and(eq(resources.id, id), ne(resources.status, "closed")));
+    return resource;
   }
 
   // === Lists (formerly collections) ===
