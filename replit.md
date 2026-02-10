@@ -55,6 +55,14 @@ The frontend lives in `client/src/` with pages in `pages/`, reusable components 
 - `collection_items` — Join table linking collections to resources
 
 ### Recent Changes (Feb 2026)
+- **Milestone 4**: Local Signal Feed at /signals
+  - Two-lane board: Action Required vs Noise/Low Priority
+  - Signal types: closure, capacity, policy, event, alert, rumor
+  - Create/edit/delete signals with title, summary, type, lane, impact/BS scores
+  - Move signals between Action and Noise lanes
+  - Detail dialog with full signal info, linked resources, triage actions
+  - Search and type filtering across both lanes
+  - API: GET/POST /api/signals, GET/PUT/DELETE /api/signals/:id, GET /api/signals/count
 - **Milestone 3**: XO Clusters visual triage interface at /clusters
   - Status-lane board layout: Unverified, Needs Info, Verified, Limited, Closed columns
   - Resource cards with confidence scores, missing field indicators, tag badges

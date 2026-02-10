@@ -11,6 +11,7 @@ import Review from "@/pages/Review";
 import Lists from "@/pages/Lists";
 import ListDetails from "@/pages/ListDetails";
 import XOClusters from "@/pages/XOClusters";
+import SignalFeed from "@/pages/SignalFeed";
 import PublicSearch from "@/pages/PublicSearch";
 import NotFound from "@/pages/not-found";
 
@@ -25,6 +26,7 @@ function AdminLayout() {
             <Route path="/resources" component={Resources} />
             <Route path="/review" component={Review} />
             <Route path="/clusters" component={XOClusters} />
+            <Route path="/signals" component={SignalFeed} />
             <Route path="/lists" component={Lists} />
             <Route path="/lists/:id" component={ListDetails} />
             <Route component={NotFound} />

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Database, CheckSquare, ListMusic, LogOut, Settings, Layers } from "lucide-react";
+import { LayoutDashboard, Database, CheckSquare, ListMusic, LogOut, Settings, Layers, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { label: "Resources", href: "/resources", icon: Database },
   { label: "Review Mode", href: "/review", icon: CheckSquare },
   { label: "XO Clusters", href: "/clusters", icon: Layers },
+  { label: "Signal Feed", href: "/signals", icon: Radio },
   { label: "My Lists", href: "/lists", icon: ListMusic },
 ];
 
